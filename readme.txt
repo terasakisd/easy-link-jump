@@ -1,7 +1,7 @@
 === Easy Link Jump ===
 Requires at least: 5.0
 Tested up to: 6.6
-Stable tag: 5.2.0
+Stable tag: 5.2.1
 License: GPL-2.0-or-later
 
 aタグに data-p="リファラ" を設定すると、ホバー時には href に指定したURLが

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Easy Link Jump
  * Description: a タグに data-p="リファラ" を設定すると、ホバー時には href のURLが表示され、クリック時にはリファラに対応する広告リンクURL(ASP経由)へ遷移します。
- * Version: 5.2.0
+ * Version: 5.2.1
  * Author: -
  * License: GPL-2.0-or-later
  * Update URI: https://github.com/terasakisd/easy-link-jump/
@@ -31,7 +31,7 @@ class Easy_Link_Jump {
 	const OPTION       = 'elj_links';
 	const OPTION_BASE  = 'elj_base_url';
 	const OPTION_ALIAS = 'elj_aliases';
-	const VERSION      = '5.2.0';
+	const VERSION      = '5.2.1';
 
 	public function __construct() {
 		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_front' ) );
@@ -194,12 +194,6 @@ class Easy_Link_Jump {
 				style="width:100%;max-width:480px;"
 				placeholder="例: https://www.smc-g.co.jp/html/ad/">
 		</p>
-		<p class="description" style="margin-top:0;">
-			下の「広告リンク」欄にファイル名だけ(例: <code>acom262.html</code>)を書くと、
-			「共通URL+ファイル名?リファラ」に自動で組み立てます(リファラの2度書き不要)。<br>
-			<code>http</code> から始まるURLを書いた場合はそのまま使われます。URLに「?」が無い場合のみリファラを自動付与します。
-		</p>
-
 		<h4 style="margin-bottom:4px;">リンク対応表(リファラ → 広告リンク)</h4>
 		<?php
 		$this->render_table(
