@@ -1,7 +1,7 @@
 === Easy Link Jump ===
 Requires at least: 5.0
 Tested up to: 6.6
-Stable tag: 5.2.1
+Stable tag: 5.2.2
 License: GPL-2.0-or-later
 
 aタグに data-p="リファラ" を設定すると、ホバー時には href に指定したURLが
@@ -24,10 +24,10 @@ aタグに data-p="リファラ" を設定すると、ホバー時には href �
 
    共通URL:   https://www.smc-g.co.jp/html/ad/
    リファラ:   cardloan_osusume_btn
-   広告リンク: acom262.html
+   広告リンク: acom.html
 
    → クリック時の遷移先は
-      https://www.smc-g.co.jp/html/ad/acom262.html?cardloan_osusume_btn
+      https://www.smc-g.co.jp/html/ad/acom.html?cardloan_osusume_btn
       に自動で組み立てられます(リファラの2度書き不要)。
 
 3. クリックした瞬間にJSが href をリファラに対応するURLへ差し替えて遷移。
@@ -35,16 +35,26 @@ aタグに data-p="リファラ" を設定すると、ホバー時には href �
 
 == 広告リンク欄の書き方 ==
 
-- ファイル名だけ(例: acom262.html)
+- ファイル名だけ(例: acom.html)
   → 共通URL+ファイル名?リファラ に自動で組み立て
 - http(s) から始まるURL全体
   → そのまま使用(「?」が無い場合のみリファラを自動付与)
+- 空欄
+  → リファラ自体を「ファイル名?リファラ」とみなして
+    共通URL+リファラ に組み立て
+    (例: リファラ acom.html?cardloan_osusume_btn
+      → https://www.smc-g.co.jp/html/ad/acom.html?cardloan_osusume_btn。
+    記事の data-p にも同じ値を書く)
 
 == ダミーURL変換(hrefの別名) ==
 
 href="アコム" のように別名で書くと、ページ表示時に登録した表示URLへ
 自動変換されます(例: アコム → https://www.acom.co.jp/)。
 ホバー時に表示されるダミーURLの書き間違いを防げます。
+
+リンクチェックツールで「URLの形式が不正」とエラーになる場合は、
+href="#アコム" のように先頭に # を付けて書いてください
+(同じように変換され、チェックにも引っかかりません)。
 
 == ポイント ==
 

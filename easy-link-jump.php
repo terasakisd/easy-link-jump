@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Easy Link Jump
  * Description: a タグに data-p="リファラ" を設定すると、ホバー時には href のURLが表示され、クリック時にはリファラに対応する広告リンクURL(ASP経由)へ遷移します。
- * Version: 5.2.1
+ * Version: 5.2.2
  * Author: -
  * License: GPL-2.0-or-later
  * Update URI: https://github.com/terasakisd/easy-link-jump/
@@ -31,7 +31,7 @@ class Easy_Link_Jump {
 	const OPTION       = 'elj_links';
 	const OPTION_BASE  = 'elj_base_url';
 	const OPTION_ALIAS = 'elj_aliases';
-	const VERSION      = '5.2.1';
+	const VERSION      = '5.2.2';
 
 	public function __construct() {
 		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_front' ) );
@@ -49,12 +49,17 @@ class Easy_Link_Jump {
 		$base  = get_option( self::OPTION_BASE, '' );
 		$rows  = array();
 		foreach ( (array) $links as $link ) {
-			if ( ! isset( $link['key'], $link['url'] ) || '' === $link['key'] || '' === $link['url'] ) {
+			if ( ! isset( $link['key'] ) || '' === $link['key'] ) {
+				continue;
+			}
+			$url = isset( $link['url'] ) ? $link['url'] : '';
+			// 広告リンク欄が空の行は、共通URLが設定されている場合のみ有効
+			if ( '' === $url && '' === $base ) {
 				continue;
 			}
 			$rows[] = array(
 				'key' => $link['key'],
-				'url' => $this->compose_url( $link['url'], $link['key'], $base ),
+				'url' => $this->compose_url( $url, $link['key'], $base ),
 			);
 		}
 		if ( empty( $rows ) ) {
@@ -77,23 +82,33 @@ class Easy_Link_Jump {
 
 	/**
 	 * 広告リンクの最終URLを組み立てる。
+	 * - 広告リンク欄が空の場合は、リファラ自体を「ファイル名?リファラ」とみなして
+	 *   共通URLと組み立てる(例: リファラ acom.html?xxx → https://example.com/ad/acom.html?xxx)
 	 * - http(s) から始まらない入力は「共通URL+入力値」として扱う
 	 * - 「?」を含まない場合はリファラをクエリとして自動付与する
-	 *   (例: 共通URL https://example.com/ad/ + acom262.html + リファラ xxx
-	 *     → https://example.com/ad/acom262.html?xxx)
+	 *   (例: 共通URL https://example.com/ad/ + acom.html + リファラ xxx
+	 *     → https://example.com/ad/acom.html?xxx)
 	 */
 	public function compose_url( $url, $key, $base ) {
+		$append_key = '' !== $url;
+		if ( '' === $url ) {
+			// リファラに「?」が含まれていればそのまま、無ければ ?リファラ の自動付与はせず
+			// 共通URL+リファラ として扱う
+			$url = $key;
+		}
 		if ( ! preg_match( '#^https?://#i', $url ) && '' !== $base ) {
 			$url = rtrim( $base, '/' ) . '/' . ltrim( $url, '/' );
 		}
-		if ( false === strpos( $url, '?' ) && '' !== $key ) {
+		if ( $append_key && false === strpos( $url, '?' ) && '' !== $key ) {
 			$url .= '?' . $key;
 		}
 		return $url;
 	}
 
 	/**
-	 * href="アコム" のような別名を、登録済みの表示URL(ダミーURL)へ出力時に変換する
+	 * href="アコム" のような別名を、登録済みの表示URL(ダミーURL)へ出力時に変換する。
+	 * リンクチェックツールで「URLの形式が不正」とされないよう href="#アコム" の形式にも対応
+	 * (エディタが日本語をパーセントエンコードして保存した場合も変換できるようにしておく)
 	 */
 	public function replace_href_aliases( $content ) {
 		$aliases = get_option( self::OPTION_ALIAS, array() );
@@ -101,12 +116,15 @@ class Easy_Link_Jump {
 			if ( ! isset( $row['alias'], $row['url'] ) || '' === $row['alias'] || '' === $row['url'] ) {
 				continue;
 			}
-			$url     = esc_url( $row['url'] );
-			$content = str_replace(
-				array( 'href="' . $row['alias'] . '"', "href='" . $row['alias'] . "'" ),
-				'href="' . $url . '"',
-				$content
-			);
+			$url      = esc_url( $row['url'] );
+			$patterns = array();
+			foreach ( array_unique( array( $row['alias'], rawurlencode( $row['alias'] ) ) ) as $alias ) {
+				foreach ( array( '', '#' ) as $prefix ) {
+					$patterns[] = 'href="' . $prefix . $alias . '"';
+					$patterns[] = "href='" . $prefix . $alias . "'";
+				}
+			}
+			$content = str_replace( $patterns, 'href="' . $url . '"', $content );
 		}
 		return $content;
 	}
@@ -194,6 +212,13 @@ class Easy_Link_Jump {
 				style="width:100%;max-width:480px;"
 				placeholder="例: https://www.smc-g.co.jp/html/ad/">
 		</p>
+		<p class="description" style="margin-top:0;">
+			下の「広告リンク」欄にファイル名だけ(例: <code>acom.html</code>)を書くと、
+			「共通URL+ファイル名?リファラ」に自動で組み立てます(リファラの2度書き不要)。<br>
+			<code>http</code> から始まるURLを書いた場合はそのまま使われます。URLに「?」が無い場合のみリファラを自動付与します。<br>
+			リファラ自体を「ファイル名?リファラ」の形(例: <code>acom.html?cardloan_osusume_btn</code>)で書く場合は、
+			広告リンク欄は<strong>空のままでOK</strong>です(「共通URL+リファラ」に組み立てます。記事の data-p にも同じ値を書いてください)。
+		</p>
 		<h4 style="margin-bottom:4px;">リンク対応表(リファラ → 広告リンク)</h4>
 		<?php
 		$this->render_table(
@@ -202,7 +227,7 @@ class Easy_Link_Jump {
 			array_values( $links ),
 			array(
 				array( 'name' => 'key', 'label' => 'リファラ', 'placeholder' => '例: cardloan_osusume_btn', 'width' => '38%' ),
-				array( 'name' => 'url', 'label' => '広告リンク(ファイル名 または URL全体)', 'placeholder' => '例: acom262.html', 'width' => '' ),
+				array( 'name' => 'url', 'label' => '広告リンク(ファイル名 または URL全体)', 'placeholder' => '例: acom.html', 'width' => '' ),
 			)
 		);
 		?>
@@ -210,7 +235,9 @@ class Easy_Link_Jump {
 		<h4 style="margin-bottom:4px;">ダミーURL変換(hrefの別名)</h4>
 		<p class="description" style="margin-top:0;">
 			記事内で <code>href="アコム"</code> のように別名で書くと、ページの表示時に登録した表示URLへ自動で変換されます。<br>
-			例: 別名「アコム」/ 表示URL「https://www.acom.co.jp/」 → <code>href="アコム"</code> が <code>href="https://www.acom.co.jp/"</code> になります。
+			例: 別名「アコム」/ 表示URL「https://www.acom.co.jp/」 → <code>href="アコム"</code> が <code>href="https://www.acom.co.jp/"</code> になります。<br>
+			リンクチェックツールで「URLの形式が不正」とエラーになる場合は、<code>href="#アコム"</code> のように
+			<strong>先頭に # を付けて</strong>書いてください(同じように変換され、チェックにも引っかかりません)。
 		</p>
 		<?php
 		$this->render_table(
@@ -339,12 +366,13 @@ class Easy_Link_Jump {
 				continue;
 			}
 			$key = isset( $row['key'] ) ? sanitize_text_field( trim( $row['key'] ) ) : '';
-			// 共通URLと組み合わせる相対指定(acom262.html など)も許可するため
+			// 共通URLと組み合わせる相対指定(acom.html など)も許可するため
 			// esc_url_raw ではなく sanitize_text_field を使う
 			$url = isset( $row['url'] ) ? sanitize_text_field( trim( $row['url'] ) ) : '';
+			// 広告リンク欄は空でもOK(リファラが「ファイル名?リファラ」形式の場合)。
 			// 同じリファラの複数登録はOK(ランダム振り分け用)。key+url が完全に同じ行だけ除外
 			$pair = $key . ' ' . $url;
-			if ( '' === $key || '' === $url || isset( $seen[ $pair ] ) ) {
+			if ( '' === $key || isset( $seen[ $pair ] ) ) {
 				continue;
 			}
 			$seen[ $pair ] = true;
