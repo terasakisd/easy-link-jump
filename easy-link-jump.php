@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Easy Link Jump
  * Description: a タグに href="#別名" と data-p="リファラ" を設定すると、ホバー時には別名に対応する表示URL(ダミーURL)が表示され、クリック時には「共通URL+広告ファイル名?リファラ」の広告リンクURL(ASP経由)へ遷移します。
- * Version: 5.3.1
+ * Version: 5.3.2
  * Author: -
  * License: GPL-2.0-or-later
  * Update URI: https://github.com/terasakisd/easy-link-jump/
@@ -30,7 +30,7 @@ class Easy_Link_Jump {
 
 	const OPTION_BASE  = 'elj_base_url';
 	const OPTION_ALIAS = 'elj_aliases';
-	const VERSION      = '5.3.1';
+	const VERSION      = '5.3.2';
 
 	public function __construct() {
 		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_front' ) );
@@ -144,16 +144,60 @@ class Easy_Link_Jump {
 			$aliases = array( array( 'alias' => '', 'url' => '', 'file' => '' ) );
 		}
 		$base = get_option( self::OPTION_BASE, '' );
+
+		// 説明用の例。登録済みの行があれば実際の値で例を作る
+		$example_rows = array();
+		foreach ( (array) $aliases as $row ) {
+			if ( empty( $row['alias'] ) || empty( $row['url'] ) || empty( $row['file'] ) ) {
+				continue;
+			}
+			$example_rows[] = $row;
+			if ( count( $example_rows ) >= 2 ) {
+				break;
+			}
+		}
+		if ( empty( $example_rows ) ) {
+			$example_rows = array(
+				array( 'alias' => '#アコム', 'url' => 'https://www.acom.co.jp/', 'file' => 'acom.html' ),
+				array( 'alias' => '#プロミス', 'url' => 'https://www.promise.co.jp/', 'file' => 'promise.html' ),
+			);
+		}
+		$example_base = '' !== $base ? $base : 'https://www.smc-g.co.jp/html/ad/';
+		$example_refs = array( 'cardloan_osusume_btn', 'cardloan_table_txt' );
+
 		wp_nonce_field( 'elj_save', 'elj_nonce' );
 		?>
 		<input type="hidden" name="elj_present" value="1">
-		<p>
-			記事にはこう書くだけ:<br>
-			<code>&lt;a href="#アコム" data-p="リファラ" rel="noopener noreferrer nofollow" target="_blank"&gt;申し込みはこちら&lt;/a&gt;</code><br>
-			・href:下の表の「別名」(# 付き)<br>
-			・data-p:計測用リファラ(自由に命名、登録不要)<br>
-			表示時は href が表示URLに変わり、クリック時は「共通URL+広告ファイル名?リファラ」へ遷移します。
+		<p style="margin-bottom:6px;">
+			記事には <code>href="#別名"</code>(下の表に登録)と <code>data-p="リファラ"</code>(自由に命名・登録不要)を書くだけです。
 		</p>
+		<table class="widefat striped" style="margin-bottom:16px;">
+			<thead>
+				<tr>
+					<th>記事に書くコード</th>
+					<th style="width:44%;">どうなるか</th>
+				</tr>
+			</thead>
+			<tbody>
+				<?php foreach ( $example_rows as $i => $row ) : ?>
+				<?php
+				$alias = '#' . ltrim( $row['alias'], '#' );
+				$ref   = $example_refs[ $i % count( $example_refs ) ];
+				$file  = $row['file'];
+				$dest  = preg_match( '#^https?://#i', $file )
+					? $file . ( false === strpos( $file, '?' ) ? '?' . $ref : '' )
+					: rtrim( $example_base, '/' ) . '/' . ltrim( $file, '/' ) . '?' . $ref;
+				?>
+				<tr>
+					<td><code>&lt;a href="<?php echo esc_html( $alias ); ?>" data-p="<?php echo esc_html( $ref ); ?>" rel="noopener noreferrer nofollow" target="_blank"&gt;申し込みはこちら&lt;/a&gt;</code></td>
+					<td>
+						ホバー時の表示: <code><?php echo esc_html( $row['url'] ); ?></code><br>
+						クリック時の遷移先: <code><?php echo esc_html( $dest ); ?></code>
+					</td>
+				</tr>
+				<?php endforeach; ?>
+			</tbody>
+		</table>
 
 		<h4 style="margin-bottom:4px;">共通URL(広告リンクのベースURL)</h4>
 		<p style="margin-top:0;">

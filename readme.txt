@@ -1,7 +1,7 @@
 === Easy Link Jump ===
 Requires at least: 5.0
 Tested up to: 6.6
-Stable tag: 5.3.1
+Stable tag: 5.3.2
 License: GPL-2.0-or-later
 
 aタグに href="#別名" と data-p="リファラ" を書くと、表示時には別名に対応する
