@@ -3,6 +3,7 @@
 
 	var cfg  = window.eljConfig || {};
 	var rows = Array.isArray(cfg.links) ? cfg.links : [];
+	var base = typeof cfg.base === 'string' ? cfg.base.replace(/\/+$/, '') : '';
 
 	// リファラ(data-p の値)→ 本当のリンク先URL の対応表。
 	// 同じリファラに複数登録されている場合はランダム振り分け用に配列で持つ
@@ -16,11 +17,21 @@
 
 	function destinationFor(a) {
 		var key  = a.getAttribute('data-p');
-		var list = key && map[key];
-		if (!list || !list.length) {
+		if (!key) {
 			return null;
 		}
-		return list.length === 1 ? list[0] : list[Math.floor(Math.random() * list.length)];
+		var list = map[key];
+		if (list && list.length) {
+			return list.length === 1 ? list[0] : list[Math.floor(Math.random() * list.length)];
+		}
+		// data-p が「ファイル名?リファラ」形式の場合、リファラ部分だけの登録でも反応させる。
+		// ファイル名は data-p 側の指定を使い、共通URLと組み立てる
+		// (同じリファラを複数ASPで共有していても、data-p のファイル名どおりに遷移する)
+		var q = key.indexOf('?');
+		if (base && q > 0 && map[key.slice(q + 1)]) {
+			return base + '/' + key.slice(0, q).replace(/^\/+/, '') + '?' + key.slice(q + 1);
+		}
+		return null;
 	}
 
 	// ホバー時に飛び先ドメインへ接続準備(DNS解決・TLSハンドシェイク)を先に走らせ、
@@ -55,6 +66,9 @@
 
 	// ページ表示直後に、登録されている全ドメインへ接続準備を済ませておく
 	function preconnectAll() {
+		if (base) {
+			preconnectUrl(base + '/');
+		}
 		Object.keys(map).forEach(function (key) {
 			map[key].forEach(preconnectUrl);
 		});

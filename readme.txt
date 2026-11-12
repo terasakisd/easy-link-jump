@@ -1,7 +1,7 @@
 === Easy Link Jump ===
 Requires at least: 5.0
 Tested up to: 6.6
-Stable tag: 5.2.2
+Stable tag: 5.2.3
 License: GPL-2.0-or-later
 
 aタグに data-p="リファラ" を設定すると、ホバー時には href に指定したURLが
@@ -45,6 +45,21 @@ aタグに data-p="リファラ" を設定すると、ホバー時には href �
     (例: リファラ acom.html?cardloan_osusume_btn
       → https://www.smc-g.co.jp/html/ad/acom.html?cardloan_osusume_btn。
     記事の data-p にも同じ値を書く)
+
+== data-p の書き方 ==
+
+- 対応表のリファラと完全一致する値(基本)
+- 「ファイル名?リファラ」形式(例: acom.html?cardloan_osusume_btn)
+  → 完全一致する登録が無くても、リファラ部分(cardloan_osusume_btn)だけの
+    登録があれば反応し、共通URL+ファイル名?リファラ へ遷移します。
+    ファイル名は data-p 側の指定を使うため、同じリファラを
+    acom.html / promise.html など複数ASPで共有できます。
+
+== 二重付与の防止 ==
+
+リファラが「ファイル名?リファラ」形式で、広告リンク欄にも同じファイル名が
+入っている場合(例: リファラ acom.html?xxx+広告リンク acom.html)、
+クエリの二重付与(acom.html?acom.html?xxx)にならないよう自動で重複を除きます。
 
 == ダミーURL変換(hrefの別名) ==
 
