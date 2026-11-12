@@ -1,7 +1,7 @@
 === Easy Link Jump ===
 Requires at least: 5.0
 Tested up to: 6.6
-Stable tag: 5.3.0
+Stable tag: 5.3.1
 License: GPL-2.0-or-later
 
 aタグに href="#別名" と data-p="リファラ" を書くと、表示時には別名に対応する
@@ -18,7 +18,7 @@ aタグに href="#別名" と data-p="リファラ" を書くと、表示時に�
    ・href:登録した別名を # 付きで書く
    ・data-p:計測用リファラ(自由に命名、登録不要)
 
-2. 投稿編集画面のメタボックスで登録する(データはサイト共通):
+2. 「設定 → メタモンリンク」で登録する(すべての記事で共通):
 
    共通URL: https://www.smc-g.co.jp/html/ad/
 

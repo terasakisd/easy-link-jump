@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Easy Link Jump
  * Description: a タグに href="#別名" と data-p="リファラ" を設定すると、ホバー時には別名に対応する表示URL(ダミーURL)が表示され、クリック時には「共通URL+広告ファイル名?リファラ」の広告リンクURL(ASP経由)へ遷移します。
- * Version: 5.3.0
+ * Version: 5.3.1
  * Author: -
  * License: GPL-2.0-or-later
  * Update URI: https://github.com/terasakisd/easy-link-jump/
@@ -30,12 +30,11 @@ class Easy_Link_Jump {
 
 	const OPTION_BASE  = 'elj_base_url';
 	const OPTION_ALIAS = 'elj_aliases';
-	const VERSION      = '5.3.0';
+	const VERSION      = '5.3.1';
 
 	public function __construct() {
 		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_front' ) );
-		add_action( 'add_meta_boxes', array( $this, 'add_meta_box' ) );
-		add_action( 'save_post', array( $this, 'save_meta_box' ) );
+		add_action( 'admin_menu', array( $this, 'add_settings_page' ) );
 		add_filter( 'the_content', array( $this, 'replace_href_aliases' ) );
 	}
 
@@ -105,27 +104,39 @@ class Easy_Link_Jump {
 	}
 
 	/**
-	 * 投稿編集画面:エディタ下のメタボックス(priority: high で上寄せ)
+	 * 設定 → メタモンリンク(リンク登録はすべての記事で共通)
 	 */
-	public function add_meta_box() {
-		foreach ( array( 'post', 'page' ) as $post_type ) {
-			add_meta_box(
-				'easy-link-jump',
-				'メタモンリンク(Easy Link Jump)',
-				array( $this, 'render_meta_box' ),
-				$post_type,
-				'normal',
-				'high'
-			);
-		}
+	public function add_settings_page() {
+		add_options_page(
+			'メタモンリンク',
+			'メタモンリンク',
+			'manage_options',
+			'easy-link-jump',
+			array( $this, 'render_settings_page' )
+		);
 	}
 
-	public function render_meta_box() {
-		$this->render_form();
+	public function render_settings_page() {
+		if ( isset( $_POST['elj_present'] ) ) {
+			check_admin_referer( 'elj_save', 'elj_nonce' );
+			if ( current_user_can( 'manage_options' ) ) {
+				$this->save_options();
+				echo '<div class="notice notice-success is-dismissible"><p>保存しました。</p></div>';
+			}
+		}
+		?>
+		<div class="wrap">
+			<h1>メタモンリンク(Easy Link Jump)</h1>
+			<form method="post">
+				<?php $this->render_form(); ?>
+				<?php submit_button( '変更を保存' ); ?>
+			</form>
+		</div>
+		<?php
 	}
 
 	/**
-	 * メタボックスのフォーム(データはサイト共通)
+	 * 設定ページのフォーム(データはすべての記事で共通)
 	 */
 	private function render_form() {
 		$aliases = get_option( self::OPTION_ALIAS, array() );
@@ -245,22 +256,6 @@ class Easy_Link_Jump {
 			<button type="button" class="button elj-add" data-target="<?php echo esc_attr( $id ); ?>">行を追加</button>
 		</p>
 		<?php
-	}
-
-	/**
-	 * 記事の保存時に登録内容も保存する(データはサイト共通)
-	 */
-	public function save_meta_box( $post_id ) {
-		if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
-			return;
-		}
-		if ( ! isset( $_POST['elj_nonce'] ) || ! wp_verify_nonce( $_POST['elj_nonce'], 'elj_save' ) ) {
-			return;
-		}
-		if ( ! current_user_can( 'edit_post', $post_id ) || ! isset( $_POST['elj_present'] ) ) {
-			return;
-		}
-		$this->save_options();
 	}
 
 	private function save_options() {
