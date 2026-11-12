@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: Easy Link Jump
- * Description: a タグに data-p="リファラ" を設定すると、ホバー時には href のURLが表示され、クリック時にはリファラに対応する広告リンクURL(ASP経由)へ遷移します。
- * Version: 5.2.3
+ * Description: a タグに href="#別名" と data-p="リファラ" を設定すると、ホバー時には別名に対応する表示URL(ダミーURL)が表示され、クリック時には「共通URL+広告ファイル名?リファラ」の広告リンクURL(ASP経由)へ遷移します。
+ * Version: 5.3.0
  * Author: -
  * License: GPL-2.0-or-later
  * Update URI: https://github.com/terasakisd/easy-link-jump/
@@ -28,41 +28,32 @@ if ( file_exists( __DIR__ . '/plugin-update-checker/plugin-update-checker.php' )
 
 class Easy_Link_Jump {
 
-	const OPTION       = 'elj_links';
 	const OPTION_BASE  = 'elj_base_url';
 	const OPTION_ALIAS = 'elj_aliases';
-	const VERSION      = '5.2.3';
+	const VERSION      = '5.3.0';
 
 	public function __construct() {
 		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_front' ) );
 		add_action( 'add_meta_boxes', array( $this, 'add_meta_box' ) );
 		add_action( 'save_post', array( $this, 'save_meta_box' ) );
-		add_action( 'admin_menu', array( $this, 'add_settings_page' ) );
 		add_filter( 'the_content', array( $this, 'replace_href_aliases' ) );
 	}
 
 	/**
-	 * フロント側:差し替え用スクリプトと登録データを読み込む
+	 * フロント側:差し替え用スクリプトと共通URLを読み込む。
+	 * 広告ファイル名が1つも登録されていなければ読み込まない
 	 */
 	public function enqueue_front() {
-		$links = get_option( self::OPTION, array() );
-		$base  = get_option( self::OPTION_BASE, '' );
-		$rows  = array();
-		foreach ( (array) $links as $link ) {
-			if ( ! isset( $link['key'] ) || '' === $link['key'] ) {
-				continue;
+		$base     = get_option( self::OPTION_BASE, '' );
+		$aliases  = get_option( self::OPTION_ALIAS, array() );
+		$has_file = false;
+		foreach ( (array) $aliases as $row ) {
+			if ( ! empty( $row['file'] ) ) {
+				$has_file = true;
+				break;
 			}
-			$url = isset( $link['url'] ) ? $link['url'] : '';
-			// 広告リンク欄が空の行は、共通URLが設定されている場合のみ有効
-			if ( '' === $url && '' === $base ) {
-				continue;
-			}
-			$rows[] = array(
-				'key' => $link['key'],
-				'url' => $this->compose_url( $url, $link['key'], $base ),
-			);
 		}
-		if ( empty( $rows ) ) {
+		if ( ! $has_file ) {
 			return;
 		}
 
@@ -75,46 +66,16 @@ class Easy_Link_Jump {
 		);
 		wp_add_inline_script(
 			'easy-link-jump',
-			'window.eljConfig = ' . wp_json_encode( array( 'links' => $rows, 'base' => $base ) ) . ';',
+			'window.eljConfig = ' . wp_json_encode( array( 'base' => $base ) ) . ';',
 			'before'
 		);
 	}
 
 	/**
-	 * 広告リンクの最終URLを組み立てる。
-	 * - 広告リンク欄が空の場合は、リファラ自体を「ファイル名?リファラ」とみなして
-	 *   共通URLと組み立てる(例: リファラ acom.html?xxx → https://example.com/ad/acom.html?xxx)
-	 * - http(s) から始まらない入力は「共通URL+入力値」として扱う
-	 * - 「?」を含まない場合はリファラをクエリとして自動付与する
-	 *   (例: 共通URL https://example.com/ad/ + acom.html + リファラ xxx
-	 *     → https://example.com/ad/acom.html?xxx)
-	 */
-	public function compose_url( $url, $key, $base ) {
-		$append_key = '' !== $url;
-		if ( '' === $url ) {
-			// リファラに「?」が含まれていればそのまま、無ければ ?リファラ の自動付与はせず
-			// 共通URL+リファラ として扱う
-			$url = $key;
-		}
-		if ( ! preg_match( '#^https?://#i', $url ) && '' !== $base ) {
-			$url = rtrim( $base, '/' ) . '/' . ltrim( $url, '/' );
-		}
-		if ( $append_key && false === strpos( $url, '?' ) && '' !== $key ) {
-			// リファラが「ファイル名?リファラ」形式で、ファイル名が広告リンクと重複している場合は
-			// 二重付与(acom.html?acom.html?xxx)を防ぐ
-			$file = basename( $url );
-			if ( 0 === strpos( $key, $file . '?' ) ) {
-				$key = substr( $key, strlen( $file ) + 1 );
-			}
-			$url .= '?' . $key;
-		}
-		return $url;
-	}
-
-	/**
-	 * href="アコム" のような別名を、登録済みの表示URL(ダミーURL)へ出力時に変換する。
-	 * リンクチェックツールで「URLの形式が不正」とされないよう href="#アコム" の形式にも対応
-	 * (エディタが日本語をパーセントエンコードして保存した場合も変換できるようにしておく)
+	 * href="#アコム" のような別名を、登録済みの表示URL(ダミーURL)へ出力時に変換する。
+	 * 広告ファイル名が登録されている場合は、クリック時の組み立てに使う data-f 属性を自動付与する
+	 * (遷移先URL自体はソースに出力されない)。
+	 * # なしの href="アコム"、エディタがパーセントエンコードして保存した場合にも対応
 	 */
 	public function replace_href_aliases( $content ) {
 		$aliases = get_option( self::OPTION_ALIAS, array() );
@@ -122,15 +83,23 @@ class Easy_Link_Jump {
 			if ( ! isset( $row['alias'], $row['url'] ) || '' === $row['alias'] || '' === $row['url'] ) {
 				continue;
 			}
-			$url      = esc_url( $row['url'] );
+			$alias = ltrim( $row['alias'], '#' );
+			$url   = esc_url( $row['url'] );
+			$file  = isset( $row['file'] ) ? $row['file'] : '';
+
+			$replace = 'href="' . $url . '"';
+			if ( '' !== $file ) {
+				$replace .= ' data-f="' . esc_attr( $file ) . '"';
+			}
+
 			$patterns = array();
-			foreach ( array_unique( array( $row['alias'], rawurlencode( $row['alias'] ) ) ) as $alias ) {
-				foreach ( array( '', '#' ) as $prefix ) {
-					$patterns[] = 'href="' . $prefix . $alias . '"';
-					$patterns[] = "href='" . $prefix . $alias . "'";
+			foreach ( array_unique( array( $alias, rawurlencode( $alias ) ) ) as $needle ) {
+				foreach ( array( '#', '' ) as $prefix ) {
+					$patterns[] = 'href="' . $prefix . $needle . '"';
+					$patterns[] = "href='" . $prefix . $needle . "'";
 				}
 			}
-			$content = str_replace( $patterns, 'href="' . $url . '"', $content );
+			$content = str_replace( $patterns, $replace, $content );
 		}
 		return $content;
 	}
@@ -156,58 +125,23 @@ class Easy_Link_Jump {
 	}
 
 	/**
-	 * 設定 → メタモンリンク(投稿画面を開かなくても対応表を編集できる)
-	 */
-	public function add_settings_page() {
-		add_options_page(
-			'メタモンリンク',
-			'メタモンリンク',
-			'manage_options',
-			'easy-link-jump',
-			array( $this, 'render_settings_page' )
-		);
-	}
-
-	public function render_settings_page() {
-		if ( isset( $_POST['elj_present'] ) ) {
-			check_admin_referer( 'elj_save', 'elj_nonce' );
-			if ( current_user_can( 'manage_options' ) ) {
-				$this->save_options();
-				echo '<div class="notice notice-success is-dismissible"><p>保存しました。</p></div>';
-			}
-		}
-		?>
-		<div class="wrap">
-			<h1>メタモンリンク(Easy Link Jump)</h1>
-			<form method="post">
-				<?php $this->render_form(); ?>
-				<?php submit_button( '変更を保存' ); ?>
-			</form>
-		</div>
-		<?php
-	}
-
-	/**
-	 * メタボックス/設定ページ共通のフォーム
+	 * メタボックスのフォーム(データはサイト共通)
 	 */
 	private function render_form() {
-		$links = get_option( self::OPTION, array() );
-		if ( empty( $links ) ) {
-			$links = array( array( 'key' => '', 'url' => '' ) );
-		}
 		$aliases = get_option( self::OPTION_ALIAS, array() );
 		if ( empty( $aliases ) ) {
-			$aliases = array( array( 'alias' => '', 'url' => '' ) );
+			$aliases = array( array( 'alias' => '', 'url' => '', 'file' => '' ) );
 		}
 		$base = get_option( self::OPTION_BASE, '' );
 		wp_nonce_field( 'elj_save', 'elj_nonce' );
 		?>
 		<input type="hidden" name="elj_present" value="1">
 		<p>
-			aタグに <code>data-p="リファラ"</code> を設定すると、ホバー時にはhrefに指定したURLが表示されますが、クリック時にはリファラに対応する広告リンクURL(ASP経由)へ遷移します。<br>
-			・href:ホバー時に表示させるURL(ダミーURL)を設定<br>
-			・data-p:遷移先の広告リンクに対応するリファラを設定<br>
-			例: <code>&lt;a href="https://www.acom.co.jp/" data-p="cardloan_osusume_btn" rel="noopener noreferrer nofollow" target="_blank"&gt;申し込みはこちら&lt;/a&gt;</code>
+			記事にはこう書くだけ:<br>
+			<code>&lt;a href="#アコム" data-p="リファラ" rel="noopener noreferrer nofollow" target="_blank"&gt;申し込みはこちら&lt;/a&gt;</code><br>
+			・href:下の表の「別名」(# 付き)<br>
+			・data-p:計測用リファラ(自由に命名、登録不要)<br>
+			表示時は href が表示URLに変わり、クリック時は「共通URL+広告ファイル名?リファラ」へ遷移します。
 		</p>
 
 		<h4 style="margin-bottom:4px;">共通URL(広告リンクのベースURL)</h4>
@@ -218,35 +152,10 @@ class Easy_Link_Jump {
 				style="width:100%;max-width:480px;"
 				placeholder="例: https://www.smc-g.co.jp/html/ad/">
 		</p>
-		<p class="description" style="margin-top:0;">
-			下の「広告リンク」欄にファイル名だけ(例: <code>acom.html</code>)を書くと、
-			「共通URL+ファイル名?リファラ」に自動で組み立てます(リファラの2度書き不要)。<br>
-			<code>http</code> から始まるURLを書いた場合はそのまま使われます。URLに「?」が無い場合のみリファラを自動付与します。<br>
-			リファラ自体を「ファイル名?リファラ」の形(例: <code>acom.html?cardloan_osusume_btn</code>)で書く場合は、
-			広告リンク欄は<strong>空のままでOK</strong>です(「共通URL+リファラ」に組み立てます。記事の data-p にも同じ値を書いてください)。<br>
-			逆に、記事の data-p が「ファイル名?リファラ」形式(例: <code>acom.html?cardloan_osusume_btn</code>)なら、
-			対応表には<strong>リファラ部分だけ</strong>(例: <code>cardloan_osusume_btn</code>)を登録しても反応します
-			(ファイル名は data-p 側の指定を使うので、同じリファラを複数ASPで共有できます)。
-		</p>
-		<h4 style="margin-bottom:4px;">リンク対応表(リファラ → 広告リンク)</h4>
-		<?php
-		$this->render_table(
-			'elj-table-links',
-			self::OPTION,
-			array_values( $links ),
-			array(
-				array( 'name' => 'key', 'label' => 'リファラ', 'placeholder' => '例: cardloan_osusume_btn', 'width' => '38%' ),
-				array( 'name' => 'url', 'label' => '広告リンク(ファイル名 または URL全体)', 'placeholder' => '例: acom.html', 'width' => '' ),
-			)
-		);
-		?>
 
-		<h4 style="margin-bottom:4px;">ダミーURL変換(hrefの別名)</h4>
+		<h4 style="margin-bottom:4px;">リンク登録(別名 → 表示URL/広告ファイル名)</h4>
 		<p class="description" style="margin-top:0;">
-			記事内で <code>href="アコム"</code> のように別名で書くと、ページの表示時に登録した表示URLへ自動で変換されます。<br>
-			例: 別名「アコム」/ 表示URL「https://www.acom.co.jp/」 → <code>href="アコム"</code> が <code>href="https://www.acom.co.jp/"</code> になります。<br>
-			リンクチェックツールで「URLの形式が不正」とエラーになる場合は、<code>href="#アコム"</code> のように
-			<strong>先頭に # を付けて</strong>書いてください(同じように変換され、チェックにも引っかかりません)。
+			広告ファイル名はファイル名だけでOK(URL全体を書いた場合はそのまま使われます)。
 		</p>
 		<?php
 		$this->render_table(
@@ -254,8 +163,9 @@ class Easy_Link_Jump {
 			self::OPTION_ALIAS,
 			array_values( $aliases ),
 			array(
-				array( 'name' => 'alias', 'label' => '別名', 'placeholder' => '例: アコム', 'width' => '38%' ),
+				array( 'name' => 'alias', 'label' => '別名(hrefに書く名前)', 'placeholder' => '例: #アコム', 'width' => '24%' ),
 				array( 'name' => 'url', 'label' => '表示URL(ダミーURL)', 'placeholder' => '例: https://www.acom.co.jp/', 'width' => '' ),
+				array( 'name' => 'file', 'label' => '広告ファイル名', 'placeholder' => '例: acom.html', 'width' => '24%' ),
 			)
 		);
 		?>
@@ -338,7 +248,7 @@ class Easy_Link_Jump {
 	}
 
 	/**
-	 * 記事の保存時に対応表も保存する(データはサイト共通)
+	 * 記事の保存時に登録内容も保存する(データはサイト共通)
 	 */
 	public function save_meta_box( $post_id ) {
 		if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
@@ -354,43 +264,11 @@ class Easy_Link_Jump {
 	}
 
 	private function save_options() {
-		$links = isset( $_POST[ self::OPTION ] ) ? wp_unslash( $_POST[ self::OPTION ] ) : array();
-		update_option( self::OPTION, $this->sanitize_links( $links ) );
-
 		$base = isset( $_POST[ self::OPTION_BASE ] ) ? trim( sanitize_text_field( wp_unslash( $_POST[ self::OPTION_BASE ] ) ) ) : '';
 		update_option( self::OPTION_BASE, $base );
 
 		$aliases = isset( $_POST[ self::OPTION_ALIAS ] ) ? wp_unslash( $_POST[ self::OPTION_ALIAS ] ) : array();
 		update_option( self::OPTION_ALIAS, $this->sanitize_aliases( $aliases ) );
-	}
-
-	public function sanitize_links( $input ) {
-		$out  = array();
-		$seen = array();
-		if ( ! is_array( $input ) ) {
-			return $out;
-		}
-		foreach ( $input as $row ) {
-			if ( ! is_array( $row ) ) {
-				continue;
-			}
-			$key = isset( $row['key'] ) ? sanitize_text_field( trim( $row['key'] ) ) : '';
-			// 共通URLと組み合わせる相対指定(acom.html など)も許可するため
-			// esc_url_raw ではなく sanitize_text_field を使う
-			$url = isset( $row['url'] ) ? sanitize_text_field( trim( $row['url'] ) ) : '';
-			// 広告リンク欄は空でもOK(リファラが「ファイル名?リファラ」形式の場合)。
-			// 同じリファラの複数登録はOK(ランダム振り分け用)。key+url が完全に同じ行だけ除外
-			$pair = $key . ' ' . $url;
-			if ( '' === $key || isset( $seen[ $pair ] ) ) {
-				continue;
-			}
-			$seen[ $pair ] = true;
-			$out[]         = array(
-				'key' => $key,
-				'url' => $url,
-			);
-		}
-		return $out;
 	}
 
 	public function sanitize_aliases( $input ) {
@@ -405,13 +283,19 @@ class Easy_Link_Jump {
 			}
 			$alias = isset( $row['alias'] ) ? sanitize_text_field( trim( $row['alias'] ) ) : '';
 			$url   = isset( $row['url'] ) ? esc_url_raw( trim( $row['url'] ) ) : '';
-			if ( '' === $alias || '' === $url || isset( $seen[ $alias ] ) ) {
+			// 共通URLと組み合わせる相対指定(acom.html など)も許可するため
+			// esc_url_raw ではなく sanitize_text_field を使う
+			$file = isset( $row['file'] ) ? sanitize_text_field( trim( $row['file'] ) ) : '';
+			// 別名は # の有無を区別しない(「#アコム」も「アコム」も同じ扱い)
+			$dedup = ltrim( $alias, '#' );
+			if ( '' === $alias || '' === $url || isset( $seen[ $dedup ] ) ) {
 				continue;
 			}
-			$seen[ $alias ] = true;
+			$seen[ $dedup ] = true;
 			$out[]          = array(
 				'alias' => $alias,
 				'url'   => $url,
+				'file'  => $file,
 			);
 		}
 		return $out;

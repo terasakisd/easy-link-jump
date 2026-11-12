@@ -2,36 +2,26 @@
 	'use strict';
 
 	var cfg  = window.eljConfig || {};
-	var rows = Array.isArray(cfg.links) ? cfg.links : [];
 	var base = typeof cfg.base === 'string' ? cfg.base.replace(/\/+$/, '') : '';
 
-	// リファラ(data-p の値)→ 本当のリンク先URL の対応表。
-	// 同じリファラに複数登録されている場合はランダム振り分け用に配列で持つ
-	var map = {};
-	rows.forEach(function (row) {
-		if (!row || !row.key || !row.url) {
-			return;
-		}
-		(map[row.key] = map[row.key] || []).push(row.url);
-	});
-
+	// クリック時の遷移先URLを組み立てる。
+	// data-f(広告ファイル名。別名変換時にPHPが自動付与)+ data-p(リファラ)から
+	// 「共通URL+ファイル名?リファラ」を作る。data-f がURL全体ならそのまま使う
 	function destinationFor(a) {
+		var file = a.getAttribute('data-f');
 		var key  = a.getAttribute('data-p');
-		if (!key) {
+		if (!file || !key) {
 			return null;
 		}
-		var list = map[key];
-		if (list && list.length) {
-			return list.length === 1 ? list[0] : list[Math.floor(Math.random() * list.length)];
+		var url;
+		if (/^https?:\/\//i.test(file)) {
+			url = file;
+		} else if (base) {
+			url = base + '/' + file.replace(/^\/+/, '');
+		} else {
+			return null;
 		}
-		// data-p が「ファイル名?リファラ」形式の場合、リファラ部分だけの登録でも反応させる。
-		// ファイル名は data-p 側の指定を使い、共通URLと組み立てる
-		// (同じリファラを複数ASPで共有していても、data-p のファイル名どおりに遷移する)
-		var q = key.indexOf('?');
-		if (base && q > 0 && map[key.slice(q + 1)]) {
-			return base + '/' + key.slice(0, q).replace(/^\/+/, '') + '?' + key.slice(q + 1);
-		}
-		return null;
+		return url.indexOf('?') === -1 ? url + '?' + key : url;
 	}
 
 	// ホバー時に飛び先ドメインへ接続準備(DNS解決・TLSハンドシェイク)を先に走らせ、
@@ -57,21 +47,17 @@
 	}
 
 	function preconnect(a) {
-		var key  = a.getAttribute('data-p');
-		var list = key && map[key];
-		if (list) {
-			list.forEach(preconnectUrl);
+		var to = destinationFor(a);
+		if (to) {
+			preconnectUrl(to);
 		}
 	}
 
-	// ページ表示直後に、登録されている全ドメインへ接続準備を済ませておく
+	// ページ表示直後に、共通URLのドメインへ接続準備を済ませておく
 	function preconnectAll() {
 		if (base) {
 			preconnectUrl(base + '/');
 		}
-		Object.keys(map).forEach(function (key) {
-			map[key].forEach(preconnectUrl);
-		});
 	}
 	if (document.readyState === 'loading') {
 		document.addEventListener('DOMContentLoaded', preconnectAll);
