@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Easy Link Jump
  * Description: a タグに href="#別名" と data-p="リファラ" を設定すると、ホバー時には別名に対応する表示URL(ダミーURL)が表示され、クリック時には「共通URL+広告ファイル名?リファラ」の広告リンクURL(ASP経由)へ遷移します。
- * Version: 5.4.0
+ * Version: 5.4.1
  * Author: -
  * License: GPL-2.0-or-later
  * Update URI: https://github.com/terasakisd/easy-link-jump/
@@ -30,7 +30,7 @@ class Easy_Link_Jump {
 
 	const OPTION_BASE  = 'elj_base_url';
 	const OPTION_ALIAS = 'elj_aliases';
-	const VERSION      = '5.4.0';
+	const VERSION      = '5.4.1';
 
 	public function __construct() {
 		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_front' ) );
@@ -142,31 +142,26 @@ class Easy_Link_Jump {
 	private function render_manual() {
 		$steps = array(
 			array(
-				'title' => 'STEP 1: リンクを登録する(最初の1回だけ)',
+				'title' => '1. リンクを登録する',
 				'gif'   => 'manual/01-settings.gif',
-				'text'  => '共通URLを入力し、表に「名前/表示URL/広告ファイル名」を登録して「変更を保存」。ASPを追加するとき以外は触りません。',
 			),
 			array(
-				'title' => 'STEP 2: 記事にリンクを書く',
+				'title' => '2. 記事にリンクを書く',
 				'gif'   => 'manual/02-post.gif',
-				'text'  => 'エディタのコード(テキスト)タブで <code>&lt;a href="#アコム" data-p="リファラ" rel="noopener noreferrer nofollow" target="_blank"&gt;申し込みはこちら&lt;/a&gt;</code> のように書いて公開。data-p のリファラは自由に命名でき、登録は不要です。',
 			),
 			array(
-				'title' => 'STEP 3: 動作を確認する',
+				'title' => '3. 動作を確認する(左クリックで確認。右クリックで開くとダミーURLに飛びます)',
 				'gif'   => 'manual/03-check.gif',
-				'text'  => '公開した記事でリンクを<strong>左クリック</strong>し、「共通URL+広告ファイル名?リファラ」へ遷移すればOK。右クリック→新しいタブはダミーURLに飛びます(仕様)。反映されないときはページキャッシュをクリア。',
 			),
 		);
 		?>
 		<hr style="margin:32px 0 20px;">
-		<h2>使い方マニュアル(動画)</h2>
-		<p class="description">各ステップをクリックすると、実際の操作画面の録画が開きます。</p>
+		<h2>使い方マニュアル</h2>
 		<?php foreach ( $steps as $step ) : ?>
 		<details style="margin-bottom:10px;max-width:960px;">
 			<summary style="cursor:pointer;font-weight:600;padding:8px 0;"><?php echo esc_html( $step['title'] ); ?></summary>
-			<p style="margin-top:4px;"><?php echo wp_kses( $step['text'], array( 'code' => array(), 'strong' => array() ) ); ?></p>
 			<img src="<?php echo esc_url( plugins_url( $step['gif'], __FILE__ ) ); ?>"
-				alt="<?php echo esc_attr( $step['title'] ); ?> の操作録画"
+				alt="<?php echo esc_attr( $step['title'] ); ?>"
 				loading="lazy"
 				style="width:100%;max-width:960px;border:1px solid #c3c4c7;border-radius:6px;">
 		</details>
