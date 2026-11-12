@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Easy Link Jump
  * Description: a タグに href="#別名" と data-p="リファラ" を設定すると、ホバー時には別名に対応する表示URL(ダミーURL)が表示され、クリック時には「共通URL+広告ファイル名?リファラ」の広告リンクURL(ASP経由)へ遷移します。
- * Version: 5.3.3
+ * Version: 5.3.4
  * Author: -
  * License: GPL-2.0-or-later
  * Update URI: https://github.com/terasakisd/easy-link-jump/
@@ -30,7 +30,7 @@ class Easy_Link_Jump {
 
 	const OPTION_BASE  = 'elj_base_url';
 	const OPTION_ALIAS = 'elj_aliases';
-	const VERSION      = '5.3.3';
+	const VERSION      = '5.3.4';
 
 	public function __construct() {
 		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_front' ) );
@@ -215,8 +215,8 @@ class Easy_Link_Jump {
 			self::OPTION_ALIAS,
 			array_values( $aliases ),
 			array(
-				array( 'name' => 'alias', 'label' => '別名(hrefに書く名前)', 'placeholder' => '例: #アコム', 'width' => '24%' ),
-				array( 'name' => 'url', 'label' => '表示URL(ダミーURL)', 'placeholder' => '例: https://www.acom.co.jp/', 'width' => '' ),
+				array( 'name' => 'alias', 'label' => '名前(hrefに書いた値)', 'placeholder' => '例: #アコム', 'width' => '24%' ),
+				array( 'name' => 'url', 'label' => '表示URL', 'placeholder' => '例: https://www.acom.co.jp/', 'width' => '' ),
 				array( 'name' => 'file', 'label' => '広告ファイル名', 'placeholder' => '例: acom.html', 'width' => '24%' ),
 			)
 		);
