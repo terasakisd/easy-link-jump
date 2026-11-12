@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Easy Link Jump
  * Description: a タグに href="#別名" と data-p="リファラ" を設定すると、ホバー時には別名に対応する表示URL(ダミーURL)が表示され、クリック時には「共通URL+広告ファイル名?リファラ」の広告リンクURL(ASP経由)へ遷移します。
- * Version: 5.3.2
+ * Version: 5.3.3
  * Author: -
  * License: GPL-2.0-or-later
  * Update URI: https://github.com/terasakisd/easy-link-jump/
@@ -30,7 +30,7 @@ class Easy_Link_Jump {
 
 	const OPTION_BASE  = 'elj_base_url';
 	const OPTION_ALIAS = 'elj_aliases';
-	const VERSION      = '5.3.2';
+	const VERSION      = '5.3.3';
 
 	public function __construct() {
 		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_front' ) );
@@ -169,7 +169,7 @@ class Easy_Link_Jump {
 		?>
 		<input type="hidden" name="elj_present" value="1">
 		<p style="margin-bottom:6px;">
-			記事には <code>href="#別名"</code>(下の表に登録)と <code>data-p="リファラ"</code>(自由に命名・登録不要)を書くだけです。
+			記事のHTMLには <code>href="#名前"</code>(下の表に登録する名前)と <code>data-p="リファラ"</code>を書きます。
 		</p>
 		<table class="widefat striped" style="margin-bottom:16px;">
 			<thead>
@@ -208,10 +208,7 @@ class Easy_Link_Jump {
 				placeholder="例: https://www.smc-g.co.jp/html/ad/">
 		</p>
 
-		<h4 style="margin-bottom:4px;">リンク登録(別名 → 表示URL/広告ファイル名)</h4>
-		<p class="description" style="margin-top:0;">
-			広告ファイル名はファイル名だけでOK(URL全体を書いた場合はそのまま使われます)。
-		</p>
+		<h4 style="margin-bottom:4px;">リンク登録</h4>
 		<?php
 		$this->render_table(
 			'elj-table-aliases',
